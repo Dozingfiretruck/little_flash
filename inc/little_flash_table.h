@@ -11,14 +11,13 @@ extern "C" {
 
 
 /* 
-    待添加 地址位数 页大小等参数
     Flash table 
-    name | manufacturer ID |device ID | falsh type | capacity | addr bytes | erase cmd | erase size
+    name | manufacturer ID |device ID | falsh type | capacity | erase cmd | erase size
 */
 
-#define LITTLE_FLASH_CHIP_TABLE                                                                                    \
-{                                                                                                                  \
-    {"W25N01GVZEIG", LF_MF_ID_WINBOND, 0xAA21, LF_NAND_FLASH,128L*1024L*1024L-24L*128L*1024L,2,0xD8,128L*1024L},   \
+#define LITTLE_FLASH_CHIP_TABLE                                                                                 \
+{                                                                                                               \
+    {"W25N01GVZEIG", LF_MF_ID_WINBOND, 0xAA21, LF_DRIVER_NAND_FLASH, 128L*1024L*1024L, 0xD8, 64L*2048L},     \
 }
 
 #ifdef __cplusplus
