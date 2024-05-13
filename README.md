@@ -3,12 +3,17 @@
 ## 介绍
 目标做成spi flash通用框架
 
+**由于库较新，难免可能会有问题，如果遇到请积极反馈**
+
+框架部分兼容[SFUD](https://gitee.com/Armink/SFUD)项目以便迁移，如果只需要驱动NOR FLASH优先使用SFUD更稳定
+
 要求: c11
 
 ## 支持flash类型
 
-- [ ] nor flash
-- [x] nand flash
+- [x] SFDP
+- [x] NOR FLASH
+- [x] NAND FLASH
 
 ## 支持驱动方式
 
