@@ -71,12 +71,12 @@
            .erase = lf_block_device_erase,
            .sync = lf_block_device_sync,
            // block device configuration
-           .read_size = 2048,
-           .prog_size = 2048,
+           .read_size = flash.chip_info.read_size,
+           .prog_size = flash.chip_info.prog_size,
            .block_size = lf_flash.chip_info.erase_size,
            .block_count = lf_flash.chip_info.capacity / lf_flash.chip_info.erase_size,
-           .cache_size = 2048,
-           .lookahead_size = 2048,
+           .cache_size = flash.chip_info.prog_size,
+           .lookahead_size = flash.chip_info.prog_size,
            .block_cycles = 500,
        };
    
