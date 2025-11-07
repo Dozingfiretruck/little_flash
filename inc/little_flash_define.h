@@ -25,6 +25,10 @@ typedef struct little_flash little_flash_t;
 #define LF_INFO(...)  LF_PRINTF(__VA_ARGS__)
 #endif
 
+#ifndef LF_WARNING
+#define LF_WARNING(...)  LF_PRINTF(__VA_ARGS__)
+#endif
+
 #ifndef LF_ERROR
 #define LF_ERROR(...)  LF_PRINTF(__VA_ARGS__)
 #endif
@@ -180,18 +184,42 @@ typedef struct {
         };
         uint32_t pt9;
     };
-    union{
-        struct {
-            uint32_t Erase_Time_Multiplier:4;       /**< Multiplier from typical erase time to maximum erase time */
-            uint32_t Erase_Type_1_Time:7;           /**< Erase Type 1 Erase, Typical time */
-            uint32_t Erase_Type_2_Time:7;           /**< Erase Type 2 Erase, Typical time */
-            uint32_t Erase_Type_3_Time:7;           /**< Erase Type 3 Erase, Typical time */
-            uint32_t Erase_Type_4_Time:7;           /**< Erase Type 4 Erase, Typical time */
-        };
-        uint32_t pt10;
-    };
-    // ...
-
+    // union{
+    //     struct {
+    //         uint32_t Erase_Time_Multiplier:4;       /**< Multiplier from typical erase time to maximum erase time */
+    //         uint32_t Erase_Type_1_Time:7;           /**< Erase Type 1 Erase, Typical time */
+    //         uint32_t Erase_Type_2_Time:7;           /**< Erase Type 2 Erase, Typical time */
+    //         uint32_t Erase_Type_3_Time:7;           /**< Erase Type 3 Erase, Typical time */
+    //         uint32_t Erase_Type_4_Time:7;           /**< Erase Type 4 Erase, Typical time */
+    //     };
+    //     uint32_t pt10;
+    // };
+    // union{
+    //     struct {
+    //         uint32_t Page_Program_Time_Multiplier:4;        /**< Multiplier from typical time to max time for Page or byte program*/
+    //         uint32_t Page_Size:4;                           /**< Page Size */
+    //         uint32_t Page_Program_Type_1_Time:6;            /**< Page Program Typical time */
+    //         uint32_t Page_Program_Type_2_Time:5;            /**< Byte Program Typical time, first byte */
+    //         uint32_t Page_Program_Type_3_Time:5;            /**< Byte Program Typical time, additional byte */
+    //         uint32_t Erase_Chip_Type_Time:7;                /**< Chip Erase, Typical time */
+    //         uint32_t :1;
+    //     };
+    //     uint32_t pt11;
+    // };
+    // // ...
+    // uint32_t pt12;
+    // uint32_t pt13;
+    // uint32_t pt14;
+    // uint32_t pt15;
+    // uint32_t pt16;
+    // uint32_t pt17;
+    // uint32_t pt18;
+    // uint32_t pt19;
+    // uint32_t pt20;
+    // uint32_t pt21;
+    // uint32_t pt22;
+    // uint32_t pt23;
+    // // ...
 }little_flash_sfdp_pt_t;
 
 typedef struct {
@@ -227,6 +255,7 @@ typedef struct {
     uint32_t prog_size;                          /**< page size (bytes) */
     uint32_t read_size;                          /**< read size (bytes) */
     uint32_t retry_times;                        /**< retry times */
+    uint32_t erase_times;                        /**< erase time (ms) */
 } little_flash_chipinfo_t;
 
 typedef struct{
@@ -242,7 +271,7 @@ struct little_flash{
     /* unlock */
     void (*unlock)(little_flash_t *lf);
     /* wait 10us */
-    void (*wait_10us)(void);
+    void (*wait_10us)(uint32_t count);
     /* wait ms */
     void (*wait_ms)(uint32_t ms);
 #ifdef LF_USE_HEAP
@@ -259,7 +288,9 @@ struct little_flash{
 #define LF_SFDP_MAJOR_REV                           (0x01)
 #define LF_SFDP_MINOR_REV                           (0x0A)
 
-#define LF_RETRY_TIMES                              (500000)
+#define LF_RETRY_TIMES                              (10)
+#define LF_NORFLASH_ERASE_TIMES                     (50)
+#define LF_NANDFLASH_ERASE_TIMES                    (2)
 
 #define LF_NORFLASH_PAGE_ZISE                       (256)      /**< NOR flash page size (bytes) */
 #define LF_NORFLASH_SECTOR_ZISE                     (4096)     /**< NOR flash sector size (bytes) */
