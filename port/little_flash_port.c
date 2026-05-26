@@ -6,8 +6,8 @@ static lf_err_t little_flash_spi_transfer(const little_flash_t *lf,uint8_t *tx_b
     return result;
 }
 
-static void little_flash_wait_10us(void){
-    uint32_t delay = 12;
+static void little_flash_wait_10us(uint32_t count){
+    uint32_t delay = 12*count;
     while(delay--);
 }
 

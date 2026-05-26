@@ -31,14 +31,14 @@ lf_err_t little_flash_read_status(const little_flash_t *lf, uint8_t address, uin
     return result;
 }
 
-
+// timeout unit us
 static lf_err_t little_flash_wait_busy(const little_flash_t *lf, uint32_t timeout) {
     lf_err_t result = LF_ERR_OK;
     size_t retry_times = lf->chip_info.retry_times;
-    uint32_t timeout_us = timeout;
-    volatile uint8_t status;
+    int32_t timeout_us;
+    uint8_t status;
     do{
-        timeout_us = timeout;
+        timeout_us = (int32_t)timeout;
         do{
             if (lf->chip_info.type==LF_DRIVER_NOR_FLASH){
                 result = little_flash_read_status(lf, 0, &status);
@@ -49,7 +49,7 @@ static lf_err_t little_flash_wait_busy(const little_flash_t *lf, uint32_t timeou
             if (result==LF_ERR_OK && (status&LF_STATUS_REGISTER_BUSY)==0){
                 return LF_ERR_OK;
             }
-            if (timeout>1000){
+            if (timeout_us>1000){
                 lf->wait_ms(1);
                 timeout_us -= 1000;
             }else{
@@ -104,7 +104,7 @@ static lf_err_t little_flash_write_enabled(const little_flash_t *lf, uint8_t ena
     uint8_t status;
     lf->spi.transfer(lf,enable?(uint8_t[]){LF_CMD_WRITE_ENABLE}:(uint8_t[]){LF_CMD_WRITE_DISABLE}, 1,LF_NULL,0);
 
-    result = little_flash_wait_busy(lf,1);
+    result = little_flash_wait_busy(lf,1000);
     if (result) {
         LF_ERROR("Error: Write enabled timeout.");
         return result;
@@ -201,7 +201,7 @@ lf_err_t little_flash_sfdp_probe(little_flash_t *lf){
         LF_WARNING("Table Revision %d.%d parameter_length %d is too short", sfdp.parameter_major_rev, sfdp.parameter_minor_rev,sfdp.parameter_length);
         return LF_ERR_SFDP_PARAMETER;
     }
-    little_flash_sfdp_read(lf, sfdp.parameter_pointer, &sfdp.pt, sizeof(little_flash_sfdp_pt_t));
+    little_flash_sfdp_read(lf, sfdp.parameter_pointer, (uint8_t *)&sfdp.pt, sizeof(little_flash_sfdp_pt_t));
 
     //      [1] = 0xE5    0x20    0xF1    0xFF
     //      [2] = 0xFF    0xFF    0xFF    0x07
@@ -278,7 +278,7 @@ lf_err_t little_flash_device_init(little_flash_t *lf){
     uint8_t recv_data[4]={0};
     result = lf->spi.transfer(lf,(uint8_t[]){LF_CMD_JEDEC_ID}, 1, recv_data, sizeof(recv_data));
     if(result) return result;
-    // LF_DEBUG("recv_data [0]:0x%02X [1]:0x%02X [2]:0x%02X [3]:0x%02X",recv_data[0],recv_data[1],recv_data[2],recv_data[3]);
+    // LF_DEBUG("JEDEC recv_data: %02X %02X %02X %02X", recv_data[0], recv_data[1], recv_data[2], recv_data[3]);
 
     // nor flash?
     manufacturer_id = recv_data[0];
@@ -287,7 +287,7 @@ lf_err_t little_flash_device_init(little_flash_t *lf){
         if (manufacturer_id==little_flash_table[i].manufacturer_id && device_id ==little_flash_table[i].device_id){
             memcpy(&lf->chip_info,&little_flash_table[i],sizeof(little_flash_chipinfo_t));
             LF_DEBUG("JEDEC ID: manufacturer_id:0x%02X device_id:0x%04X ",little_flash_table[i].manufacturer_id,little_flash_table[i].device_id);
-            LF_DEBUG("little flash fonud flash %s",lf->chip_info.name);
+            LF_DEBUG("little flash found flash %s",lf->chip_info.name);
             result = little_flash_reset(lf);
             return result;
         }
@@ -299,13 +299,13 @@ lf_err_t little_flash_device_init(little_flash_t *lf){
         if (manufacturer_id==little_flash_table[i].manufacturer_id && device_id ==little_flash_table[i].device_id){
             memcpy(&lf->chip_info,&little_flash_table[i],sizeof(little_flash_chipinfo_t));
             LF_DEBUG("JEDEC ID: manufacturer_id:0x%02X device_id:0x%04X ",little_flash_table[i].manufacturer_id,little_flash_table[i].device_id);
-            LF_DEBUG("little flash fonud flash %s",lf->chip_info.name);
+            LF_DEBUG("little flash found flash %s",lf->chip_info.name);
             result = little_flash_reset(lf);
             return result;
         }
     }
     // all not found
-    LF_DEBUG("NOT fonud flash");
+    LF_DEBUG("NOT found flash");
     return LF_ERR_NO_FLASH;
 }
 
@@ -323,7 +323,7 @@ lf_err_t little_flash_deinit(void){
 static lf_err_t little_flash_cheak_erase(const little_flash_t *lf){
     lf_err_t result = LF_ERR_OK;
     uint8_t status;
-    result |= little_flash_wait_busy(lf,4000);
+    result |= little_flash_wait_busy(lf,1000 * 1000);// 擦除时间比较长，最长给1s
     if (result) {
         LF_ERROR("Error: Cheak erase timeout.");
         return result;
@@ -369,6 +369,7 @@ static lf_err_t little_flash_cheak_read(const little_flash_t *lf){
         if (result==0 && ecc<2){
             return LF_ERR_OK;
         }
+        return LF_ERR_READ;
     }
     return result;
 }
@@ -391,6 +392,7 @@ lf_err_t little_flash_chip_erase(const little_flash_t *lf){
     }else{
         cmd_data[0] = lf->chip_info.erase_cmd;
         while (true){
+            if(little_flash_write_enabled(lf, LF_ENABLE)) goto error;
             uint32_t page_addr = addr/lf->chip_info.prog_size;
             cmd_data[1] = page_addr >> 16;
             cmd_data[2] = page_addr >> 8;
@@ -442,22 +444,27 @@ lf_err_t little_flash_erase(const little_flash_t *lf, uint32_t addr, uint32_t le
     cmd_data[0] = lf->chip_info.erase_cmd;
 
     if(lf->chip_info.type==LF_DRIVER_NAND_FLASH){
-        erase_off = addr % lf->chip_info.read_size;
-        erase_addr = addr / lf->chip_info.read_size;
+        erase_off = addr % lf->chip_info.erase_size;
+        erase_addr = (addr / lf->chip_info.erase_size) * (lf->chip_info.erase_size / lf->chip_info.read_size);
     }else{
         erase_off = addr % lf->chip_info.erase_size;
         erase_addr = addr / lf->chip_info.erase_size * lf->chip_info.erase_size;
     }
     erase_len = len + erase_off;// 修正擦除长度,长度对齐擦除起始位置
     while (erase_len){
+        if(little_flash_write_enabled(lf, LF_ENABLE)) goto error;
+
         cmd_data[1] = erase_addr >> 16;
         cmd_data[2] = erase_addr >> 8;
         cmd_data[3] = erase_addr;
         lf->spi.transfer(lf,cmd_data, 4,LF_NULL,0);
 
         lf->wait_ms(lf->chip_info.erase_times);
-
-        if(little_flash_cheak_erase(lf)) goto error;
+        // LF_ERROR("erase_times:%d",lf->chip_info.erase_times);
+        if(little_flash_cheak_erase(lf)) {
+            // LF_ERROR("addr:%d len:%d erase_off:%d erase_addr:%d",addr, len, erase_off, erase_addr);
+            goto error;
+        }
 
         erase_addr += (lf->chip_info.type==LF_DRIVER_NAND_FLASH)?lf->chip_info.erase_size/lf->chip_info.read_size:lf->chip_info.erase_size;
 
@@ -485,6 +492,10 @@ error:
 }
 
 lf_err_t little_flash_write(const little_flash_t *lf, uint32_t addr, const uint8_t *data, uint32_t len){
+    if (addr + len > lf->chip_info.capacity) {
+        LF_ERROR("Error: Flash address is out of bound.");
+        return LF_ERR_BAD_ADDRESS;
+    }
 #ifdef LF_USE_HEAP
     uint8_t* cmd_data = (uint8_t*)lf->malloc(4+lf->chip_info.prog_size);
     if (!cmd_data){
@@ -500,14 +511,15 @@ lf_err_t little_flash_write(const little_flash_t *lf, uint32_t addr, const uint8
         lf->lock(lf);
     }
 
-    if(little_flash_write_enabled(lf, LF_ENABLE)){
-        goto error;
-    }
     while (len){
         if (little_flash_wait_busy(lf,100)){
             goto error;
         }
         
+        if(little_flash_write_enabled(lf, LF_ENABLE)){
+            goto error;
+        }
+
         if (lf->chip_info.type==LF_DRIVER_NOR_FLASH){
             cmd_data[0] = LF_CMD_PROG_DATA;
             cmd_data[1] = addr >> 16;
@@ -601,6 +613,9 @@ lf_err_t little_flash_write(const little_flash_t *lf, uint32_t addr, const uint8
     return LF_ERR_OK;
 error:
     LF_ERROR("Error: Write failed.");
+#ifdef LF_USE_HEAP
+    lf->free(cmd_data);
+#endif /* LF_USE_HEAP */
     if (lf->unlock) {
         lf->unlock(lf);
     }
